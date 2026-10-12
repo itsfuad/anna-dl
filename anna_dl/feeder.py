@@ -8,7 +8,7 @@ from typing import Any, Dict, List, Optional, Tuple
 from anna_dl.config import ANNA_MIRRORS, HEADERS, MIN_FILE_SIZE
 from anna_dl.download import download_book
 from anna_dl.search import get_working_mirror
-from anna_dl.utils import load_json, sanitize_filename, save_json
+from anna_dl.utils import load_json, sanitize_filename, save_json, document_format
 
 FEEDER_KEYS = ('title', 'author', 'format', 'isbn', 'query', 'folder')
 FORMATS = ('pdf', 'epub')
@@ -193,7 +193,7 @@ def _existing_file(book: Dict[str, Any], output_dir: Path) -> Optional[Path]:
             folder = folder / sanitize_filename(book['subcategory'])
     for ext in KNOWN_EXTENSIONS:
         path = folder / sanitize_filename(f"{book['title']} - {book['author']}.{ext}")
-        if path.exists() and path.stat().st_size >= MIN_FILE_SIZE:
+        if document_format(path, MIN_FILE_SIZE):
             return path
     return None
 
@@ -249,9 +249,6 @@ def run_feeder(
     last_pass: List[Dict[str, Any]] = []
     for book in books:
         status = ledger.get(book['key'], {}).get('status')
-        if status == DOWNLOADED:
-            stats['already_had'] += 1
-            continue
         existing = _existing_file(book, output_dir)
         if existing:
             _record(ledger, book, existing, attempted=False)
