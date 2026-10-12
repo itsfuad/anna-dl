@@ -6,6 +6,7 @@ import re
 import tempfile
 import unicodedata
 import zipfile
+import zlib
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
@@ -26,7 +27,7 @@ def document_format(path: Path, min_size: int = 10000) -> Optional[str]:
             return 'mobi'
         if header.startswith(b'AT&TFORM') and header[12:16] in (b'DJVU', b'DJVM'):
             return 'djvu'
-    except (OSError, KeyError, zipfile.BadZipFile, RuntimeError):
+    except (OSError, KeyError, zipfile.BadZipFile, RuntimeError, zlib.error, EOFError, NotImplementedError):
         pass
     return None
 

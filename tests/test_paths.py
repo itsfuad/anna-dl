@@ -35,3 +35,22 @@ class PathTests(unittest.TestCase):
         for value, expected in [('CON','_CON'), ('nul.txt','_nul.txt'), ('LPT1','_LPT1'), ('..','_'), ('Name. ','Name'), ('A\x00B\nC','ABC')]:
             with self.subTest(value=value):
                 self.assertEqual(sanitize_filename(value), expected)
+
+    def test_corrupt_compressed_epub_is_rejected_instead_of_crashing(self):
+        import random
+        import zipfile
+        from anna_dl.utils import document_format
+        with tempfile.TemporaryDirectory() as folder:
+            path = Path(folder) / 'Example - Author.epub'
+            payload = random.Random(0).getrandbits(12000 * 8).to_bytes(12000, 'little')
+            with zipfile.ZipFile(path, 'w') as archive:
+                archive.writestr('mimetype', 'application/epub+zip')
+                archive.writestr('payload', payload, compress_type=zipfile.ZIP_DEFLATED)
+            with zipfile.ZipFile(path) as archive:
+                entry = archive.getinfo('payload')
+                offset = entry.header_offset + 30 + len(entry.filename.encode()) + len(entry.extra)
+            with path.open('r+b') as stream:
+                stream.seek(offset)
+                stream.write(b'\xff')  # Invalid deflate block type.
+            self.assertIsNone(document_format(path))
+            self.assertIsNone(existing_download({'title':'Example','author':'Author'}, Path(folder)))
