@@ -31,3 +31,19 @@ class PlatformTests(unittest.TestCase):
             result = subprocess.run([sys.executable, str(script), '--help'], cwd=folder, capture_output=True, text=True)
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertIn('anna-dl', result.stdout)
+
+    def test_launcher_asks_before_installing_missing_libraries(self):
+        import shutil
+        import venv
+        with tempfile.TemporaryDirectory() as folder:
+            root = Path(folder)
+            source = Path(__file__).resolve().parents[1] / 'start_gui.py'
+            shutil.copyfile(source, root / 'start_gui.py')
+            venv.EnvBuilder(with_pip=False).create(root / '.venv')
+            for answer in ('n\n', ''):
+                with self.subTest(answer=answer):
+                    result = subprocess.run([sys.executable, str(root/'start_gui.py')], input=answer, capture_output=True, text=True, cwd=root)
+                    self.assertEqual(result.returncode, 1)
+                    self.assertIn('Install', result.stdout)
+                    self.assertNotIn('Traceback', result.stderr)
+            self.assertFalse((root / '.venv' / ('Scripts/pip.exe' if sys.platform == 'win32' else 'bin/pip')).exists())

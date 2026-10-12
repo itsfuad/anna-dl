@@ -84,8 +84,13 @@ when curl is unavailable.
 ### Desktop GUI
 
 From the source checkout, launch with `python3 start_gui.py` on Linux/macOS,
-or `py -3 start_gui.py` on Windows. The launcher selects the checkout's `.venv`
-and uses the checkout as its working directory, even when started elsewhere.
+or `py -3 start_gui.py` on Windows. No environment activation is required.
+The launcher uses the checkout's `.venv` if present, otherwise the Python you
+started it with. If required libraries are missing, it asks whether to install
+them. Only a `y`/`yes` answer creates or prepares the local `.venv` and installs
+the requirements; declining or having no interactive input exits without
+installing anything. It uses the checkout as its working directory, even when
+started elsewhere. Tkinter remains a Python/OS prerequisite as described above.
 Existing Windows shortcuts to `anna_dl_gui.pyw` also use this launcher.
 
 After installation, `anna-dl gui` (or `anna-dl-gui`) starts the desktop app.
