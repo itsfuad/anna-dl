@@ -5,14 +5,13 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
 
-from anna_dl.config import ANNA_MIRRORS, HEADERS, MIN_FILE_SIZE
+from anna_dl.config import ANNA_MIRRORS, HEADERS
 from anna_dl.download import download_book
 from anna_dl.search import get_working_mirror
-from anna_dl.utils import load_json, sanitize_filename, save_json, document_format
+from anna_dl.utils import load_json, save_json, existing_download
 
 FEEDER_KEYS = ('title', 'author', 'format', 'isbn', 'query', 'folder')
 FORMATS = ('pdf', 'epub')
-KNOWN_EXTENSIONS = ('pdf', 'epub', 'mobi', 'azw3', 'djvu')
 
 DOWNLOADED = 'downloaded'
 NOT_AVAILABLE = 'not_available'
@@ -184,20 +183,6 @@ def parse_feeder(feeder_file: Path) -> Tuple[List[Dict[str, Any]], List[Tuple[in
     return books, problems
 
 
-def _existing_file(book: Dict[str, Any], output_dir: Path) -> Optional[Path]:
-    """Finds a file downloaded earlier (e.g. from the single-book GUI) under the name download_book would use."""
-    folder = output_dir
-    if book['category_group']:
-        folder = folder / sanitize_filename(book['category_group'])
-        if book['subcategory']:
-            folder = folder / sanitize_filename(book['subcategory'])
-    for ext in KNOWN_EXTENSIONS:
-        path = folder / sanitize_filename(f"{book['title']} - {book['author']}.{ext}")
-        if document_format(path, MIN_FILE_SIZE):
-            return path
-    return None
-
-
 def _record(ledger: Dict[str, Any], book: Dict[str, Any], path: Optional[Path], attempted: bool = True) -> None:
     entry = ledger.setdefault(book['key'], {})
     entry.update({
@@ -249,7 +234,7 @@ def run_feeder(
     last_pass: List[Dict[str, Any]] = []
     for book in books:
         status = ledger.get(book['key'], {}).get('status')
-        existing = _existing_file(book, output_dir)
+        existing = existing_download(book, output_dir)
         if existing:
             _record(ledger, book, existing, attempted=False)
             stats['already_had'] += 1

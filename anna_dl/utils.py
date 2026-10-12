@@ -36,6 +36,20 @@ def sanitize_filename(name: str) -> str:
     name = re.sub(r'[\\/*?:"<>|]', '', name)
     return name.strip()[:150]
 
+def existing_download(book: Dict[str, Any], output_dir: Path) -> Optional[Path]:
+    """Finds a validated document at the exact destination for this book."""
+    folder = output_dir
+    group = book.get('category_group', book.get('category', ''))
+    if group:
+        folder /= sanitize_filename(group)
+        if book.get('subcategory'):
+            folder /= sanitize_filename(book['subcategory'])
+    for ext in ('pdf', 'epub', 'mobi', 'azw3', 'djvu'):
+        path = folder / sanitize_filename(f"{book.get('title', '')} - {book.get('author', '')}.{ext}")
+        if document_format(path):
+            return path
+    return None
+
 def clean_query_text(text: str) -> str:
     """
     Removes parentheticals, bracketed notations, and common edition markers.
