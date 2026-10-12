@@ -173,7 +173,7 @@ def download_batch(
     log_file: Path,
     limit: int = 0,
     categories: str = ''
-) -> None:
+) -> bool:
     """
     Sequential batch download with category filtering and atomic progress tracking.
     """
@@ -182,6 +182,7 @@ def download_batch(
     cats = [c.strip() for c in categories.split(',')] if categories else []
 
     count = 0
+    success = True
     for book in books:
         if limit > 0 and count >= limit:
             break
@@ -190,19 +191,25 @@ def download_batch(
             continue
 
         item_key = f"{book.get('title', '')} - {book.get('author', '')}"
-        if log_data.get(item_key, {}).get('status') == 'SUCCESS':
+        path = existing_download(book, output_dir)
+        if path:
+            log_data[item_key] = {'status': 'SUCCESS', 'path': str(path), 'bytes': path.stat().st_size}
             continue
 
-        download_book(book, anna_mirror, output_dir, log_data, log_file)
+        if download_book(book, anna_mirror, output_dir, log_data, log_file) is None:
+            success = False
         count += 1
+    save_json(log_file, log_data)
+    return success
 
 def download_parallel(
     books: List[Dict[str, Any]],
     output_dir: Path,
     log_file: Path,
     categories: str = '',
-    max_workers: int = 4
-) -> None:
+    max_workers: int = 4,
+    limit: int = 0
+) -> bool:
     """
     Multi-threaded parallel download using ThreadPoolExecutor.
     """
@@ -224,6 +231,8 @@ def download_parallel(
 
         books_to_download.append(book)
 
+    if limit > 0:
+        books_to_download = books_to_download[:limit]
     save_json(log_file, log_data)
     print(f"🚀 Starting parallel download for {len(books_to_download)} book(s) across {max_workers} worker(s)...", flush=True)
 
@@ -238,4 +247,4 @@ def download_parallel(
         return path is not None
 
     with ThreadPoolExecutor(max_workers=max_workers) as executor:
-        list(executor.map(worker, books_to_download))
+        return all(list(executor.map(worker, books_to_download)))

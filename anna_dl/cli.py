@@ -7,7 +7,7 @@ from anna_dl.search import get_working_mirror
 from anna_dl.extract import extract_books
 from anna_dl.feeder import ensure_feeder_file, run_feeder
 from anna_dl.sync import sync_log_from_disk
-from anna_dl.utils import load_json
+from anna_dl.utils import load_json, existing_download
 
 def main():
     # Windows consoles/pipes may use a legacy codepage that can't encode the emoji in log output
@@ -47,6 +47,10 @@ def main():
     parser.add_argument('--docs-dir', type=Path, help="Directory containing markdown book catalogs for 'extract'")
 
     args = parser.parse_args()
+    if args.workers < 1:
+        parser.error('--workers must be at least 1')
+    if args.limit < 0:
+        parser.error('--limit must be zero or greater')
 
     if args.bypass_dns:
         config.enable_dns_bypass()
@@ -76,7 +80,7 @@ def main():
                 print("    Add your books to it (one per line), then run this command again.")
                 sys.exit(1)
             stats = run_feeder(args.feeder_file, args.output_dir, args.ledger_file, args.format)
-            sys.exit(0 if stats['listed'] and not stats['not_available'] and not stats['pending'] else 1)
+            sys.exit(0 if stats['listed'] and not stats['not_available'] and not stats['pending'] and not stats['invalid_lines'] else 1)
 
         elif args.command == 'extract':
             if not args.docs_dir:
@@ -98,17 +102,17 @@ def main():
                     b['prefer_format'] = args.format
 
             if args.command == 'retry':
-                log_data = load_json(args.log_file, default={})
                 queue = [
                     b for b in queue
-                    if log_data.get(f"{b.get('title', '')} - {b.get('author', '')}", {}).get('status') != 'SUCCESS'
+                    if existing_download(b, args.output_dir) is None
                 ]
                 print(f"[*] Retrying {len(queue)} pending/failed book(s)...")
 
             if args.parallel:
-                download_parallel(queue, args.output_dir, args.log_file, args.categories, args.workers)
+                ok = download_parallel(queue, args.output_dir, args.log_file, args.categories, args.workers, args.limit)
             else:
-                download_batch(queue, args.output_dir, args.queue_file, args.log_file, args.limit, args.categories)
+                ok = download_batch(queue, args.output_dir, args.queue_file, args.log_file, args.limit, args.categories)
+            sys.exit(0 if ok else 1)
 
         elif args.command == 'sync':
             stats = sync_log_from_disk(args.output_dir, args.queue_file, args.log_file)
