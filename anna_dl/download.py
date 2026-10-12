@@ -6,7 +6,7 @@ from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 from typing import List, Dict, Any, Optional
 
-from anna_dl.utils import build_queries, candidate_matches, sanitize_filename, save_json, load_json, document_format
+from anna_dl.utils import build_queries, candidate_matches, sanitize_filename, save_json, load_json, document_format, existing_download
 from anna_dl.search import search_md5_candidates, get_direct_download_url, get_working_mirror
 from anna_dl.config import HEADERS, LIBGEN_MIRRORS, MIN_FILE_SIZE, ANNA_MIRRORS
 
@@ -217,27 +217,9 @@ def download_parallel(
         if cats and not any(group.startswith(c) or group == c for c in cats):
             continue
         item_key = f"{book.get('title', '')} - {book.get('author', '')}"
-        if log_data.get(item_key, {}).get('status') == 'SUCCESS':
-            continue
-
-        # Check if already present on disk in any valid extension
-        title = book.get('title', '')
-        author = book.get('author', '')
-        subcat = str(book.get('subcategory', ''))
-        already_on_disk = False
-        for ext in ('pdf', 'epub', 'mobi', 'azw3'):
-            fn = sanitize_filename(f"{title} - {author}.{ext}")
-            if group and subcat:
-                p = output_dir / sanitize_filename(group) / sanitize_filename(subcat) / fn
-            elif group:
-                p = output_dir / sanitize_filename(group) / fn
-            else:
-                p = output_dir / fn
-            if p.exists() and p.stat().st_size > 10000:
-                already_on_disk = True
-                log_data[item_key] = {'status': 'SUCCESS', 'path': str(p), 'bytes': p.stat().st_size}
-                break
-        if already_on_disk:
+        path = existing_download(book, output_dir)
+        if path:
+            log_data[item_key] = {'status': 'SUCCESS', 'path': str(path), 'bytes': path.stat().st_size}
             continue
 
         books_to_download.append(book)
@@ -246,57 +228,14 @@ def download_parallel(
     print(f"🚀 Starting parallel download for {len(books_to_download)} book(s) across {max_workers} worker(s)...", flush=True)
 
     def worker(book):
-        title = book.get('title', 'Unknown')
-        author = book.get('author', 'Unknown')
-        group = book.get('category_group', book.get('category', ''))
-        subcat = book.get('subcategory', '')
-        item_key = f"{title} - {author}"
-
-        queries = build_queries(title, author, book.get('search_query', ''))
-        for query in queries:
-            md5_candidates = search_md5_candidates(query, anna_mirror)
-            for md5 in md5_candidates:
-                url, ext, referer = get_direct_download_url(
-                    md5, LIBGEN_MIRRORS,
-                    accept=lambda meta: candidate_matches(title, book.get('author', ''), book.get('isbn', ''), meta)
-                )
-                if url and ext:
-                    filename = sanitize_filename(f"{title} - {author}.{ext}")
-                    if group and subcat:
-                        dest_path = output_dir / sanitize_filename(group) / sanitize_filename(subcat) / filename
-                    elif group:
-                        dest_path = output_dir / sanitize_filename(group) / filename
-                    else:
-                        dest_path = output_dir / filename
-
-                    if download_file(url, referer or '', dest_path):
-                        # Detect true format from magic bytes
-                        with open(dest_path, 'rb') as fp:
-                            magic = fp.read(4)
-                        if magic == b'PK\x03\x04' and dest_path.suffix != '.epub':
-                            new_path = dest_path.with_suffix('.epub')
-                            dest_path.replace(new_path)
-                            dest_path = new_path
-                        elif magic.startswith(b'%PDF') and dest_path.suffix != '.pdf':
-                            new_path = dest_path.with_suffix('.pdf')
-                            dest_path.replace(new_path)
-                            dest_path = new_path
-
-                        size_mb = round(dest_path.stat().st_size / (1024 * 1024), 2)
-                        print(f"  [✔] SUCCESS ({size_mb} MB) -> {dest_path.name}", flush=True)
-                        with lock:
-                            log_data[item_key] = {
-                                'status': 'SUCCESS',
-                                'path': str(dest_path),
-                                'bytes': dest_path.stat().st_size
-                            }
-                            save_json(log_file, log_data)
-                        return True
-        print(f"  [✖] FAILED -> {item_key}", flush=True)
+        path = download_book(book, anna_mirror, output_dir)
+        item_key = f"{book.get('title', '')} - {book.get('author', '')}"
         with lock:
-            log_data[item_key] = {'status': 'FAILED'}
+            log_data[item_key] = {
+                'status': 'SUCCESS', 'path': str(path), 'bytes': path.stat().st_size
+            } if path else {'status': 'FAILED'}
             save_json(log_file, log_data)
-        return False
+        return path is not None
 
     with ThreadPoolExecutor(max_workers=max_workers) as executor:
         list(executor.map(worker, books_to_download))
