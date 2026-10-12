@@ -56,16 +56,29 @@ def book_destination(book: Dict[str, Any], output_dir: Path, extension: str) -> 
 
 def existing_download(book: Dict[str, Any], output_dir: Path) -> Optional[Path]:
     """Finds a validated document at the exact destination for this book."""
+    def legacy_component(name: str) -> str:
+        return re.sub(r'[\\/*?:"<>|]', '', name).strip()[:150]
+
+    legacy_folder = output_dir
+    group = book.get('category_group', book.get('category', ''))
+    for component in (group, book.get('subcategory', '') if group else ''):
+        if component:
+            name = legacy_component(component)
+            if name in ('', '.', '..'):
+                legacy_folder = None
+                break
+            legacy_folder /= name
     for ext in ('pdf', 'epub', 'mobi', 'azw3', 'djvu'):
         path = book_destination(book, output_dir, ext)
         if document_format(path):
             return path
         # Earlier releases sanitized the complete name, preserving spaces/dots
         # before its extension. Recognize that exact name without prefix matches.
-        legacy_name = re.sub(r'[\\/*?:"<>|]', '', f"{book.get('title', '')} - {book.get('author', '')}.{ext}").strip()[:150]
-        legacy_path = path.with_name(legacy_name)
-        if legacy_path != path and legacy_path.suffix == '.' + ext and document_format(legacy_path):
-            return legacy_path
+        if legacy_folder is not None:
+            legacy_name = legacy_component(f"{book.get('title', '')} - {book.get('author', '')}.{ext}")
+            legacy_path = legacy_folder / legacy_name
+            if legacy_path != path and legacy_path.suffix == '.' + ext and document_format(legacy_path):
+                return legacy_path
     return None
 
 def clean_query_text(text: str) -> str:

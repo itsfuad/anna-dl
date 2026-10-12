@@ -1,5 +1,6 @@
 import contextlib
 import io
+import sys
 import tempfile
 import unittest
 from pathlib import Path
@@ -62,3 +63,13 @@ class PathTests(unittest.TestCase):
                 target = root / filename
                 target.write_bytes(b'%PDF-1.7\n' + b'x' * 12000)
                 self.assertEqual(existing_download({'title':'Example','author':author}, root), target)
+
+    @unittest.skipIf(sys.platform == 'win32', 'Windows normalizes trailing dots in directory names')
+    def test_exact_legacy_category_folders_are_still_recognized(self):
+        with tempfile.TemporaryDirectory() as folder:
+            root = Path(folder)
+            old_folder = root / 'Science.'
+            old_folder.mkdir()
+            target = old_folder / 'Example - Author.pdf'
+            target.write_bytes(b'%PDF-1.7\n' + b'x' * 12000)
+            self.assertEqual(existing_download({'title':'Example','author':'Author','category':'Science.'}, root), target)
