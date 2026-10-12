@@ -4,8 +4,30 @@ import os
 import re
 import tempfile
 import unicodedata
+import zipfile
 from pathlib import Path
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Optional
+
+def document_format(path: Path, min_size: int = 10000) -> Optional[str]:
+    """Recognizes supported documents; rejects error pages and unrelated ZIP files."""
+    try:
+        if not path.is_file() or path.stat().st_size < min_size:
+            return None
+        with path.open('rb') as stream:
+            header = stream.read(80)
+        if header.startswith(b'%PDF-'):
+            return 'pdf'
+        if header.startswith(b'PK\x03\x04'):
+            with zipfile.ZipFile(path) as archive:
+                if archive.read('mimetype').strip() == b'application/epub+zip' and archive.testzip() is None:
+                    return 'epub'
+        if header[60:68] == b'BOOKMOBI':
+            return 'mobi'
+        if header.startswith(b'AT&TFORM') and header[12:16] in (b'DJVU', b'DJVM'):
+            return 'djvu'
+    except (OSError, KeyError, zipfile.BadZipFile, RuntimeError):
+        pass
+    return None
 
 def sanitize_filename(name: str) -> str:
     """

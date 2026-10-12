@@ -6,7 +6,7 @@ from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 from typing import List, Dict, Any, Optional
 
-from anna_dl.utils import build_queries, candidate_matches, sanitize_filename, save_json, load_json
+from anna_dl.utils import build_queries, candidate_matches, sanitize_filename, save_json, load_json, document_format
 from anna_dl.search import search_md5_candidates, get_direct_download_url, get_working_mirror
 from anna_dl.config import HEADERS, LIBGEN_MIRRORS, MIN_FILE_SIZE, ANNA_MIRRORS
 
@@ -24,7 +24,7 @@ def download_file(url: str, referer: str, dest_path: Path, min_size: int = MIN_F
     # 1. Try curl with auto-resume and HTTP/1.1
     try:
         cmd = [
-            'curl', '-C', '-', '--http1.1', '-sSL',
+            'curl', '-C', '-', '--http1.1', '-fsSL',
             '-H', 'User-Agent: Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
             '--connect-timeout', '10',
             # Abort only stalled transfers (<1 KB/s for 30s) so large books aren't cut off
@@ -42,12 +42,7 @@ def download_file(url: str, referer: str, dest_path: Path, min_size: int = MIN_F
                 # Interrupted transfer: '-C -' resumes from the partial file on the next attempt
                 continue
             if temp_path.exists():
-                if temp_path.stat().st_size < min_size:
-                    temp_path.unlink(missing_ok=True)
-                    break
-                with open(temp_path, 'rb') as f:
-                    magic = f.read(10)
-                if magic.startswith(b'<!DOC') or magic.startswith(b'<html'):
+                if document_format(temp_path, min_size) is None:
                     temp_path.unlink(missing_ok=True)
                     break
                 temp_path.replace(dest_path)
@@ -72,12 +67,7 @@ def download_file(url: str, referer: str, dest_path: Path, min_size: int = MIN_F
                         f.write(chunk)
 
         if temp_path.exists():
-            if temp_path.stat().st_size < min_size:
-                temp_path.unlink(missing_ok=True)
-                return False
-            with open(temp_path, 'rb') as f:
-                magic = f.read(10)
-            if magic.startswith(b'<!DOC') or magic.startswith(b'<html'):
+            if document_format(temp_path, min_size) is None:
                 temp_path.unlink(missing_ok=True)
                 return False
             temp_path.replace(dest_path)
