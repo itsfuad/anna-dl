@@ -1,3 +1,4 @@
+import hashlib
 import json
 import math
 import os
@@ -29,23 +30,33 @@ def document_format(path: Path, min_size: int = 10000) -> Optional[str]:
         pass
     return None
 
-def sanitize_filename(name: str) -> str:
-    """
-    Strips illegal filesystem characters and limits filename length to 150 characters.
-    """
-    name = re.sub(r'[\\/*?:"<>|]', '', name)
-    return name.strip()[:150]
+def sanitize_filename(name: str, max_bytes: int = 150) -> str:
+    """Makes a bounded UTF-8 filename component safe on Linux, macOS and Windows."""
+    original = name
+    name = re.sub(r'[\\/*?:"<>|\x00-\x1f\x7f]', '', name).strip().rstrip('. ')
+    if re.match(r'^(CON|PRN|AUX|NUL|COM[1-9]|LPT[1-9])(?:\.|$)', name, re.I):
+        name = '_' + name
+    if len(name.encode('utf-8')) > max_bytes:
+        tag = '-' + hashlib.sha256(original.encode('utf-8')).hexdigest()[:10]
+        name = name.encode('utf-8')[:max_bytes - len(tag)].decode('utf-8', errors='ignore').rstrip('. ') + tag
+    return name or '_'
 
-def existing_download(book: Dict[str, Any], output_dir: Path) -> Optional[Path]:
-    """Finds a validated document at the exact destination for this book."""
+def book_destination(book: Dict[str, Any], output_dir: Path, extension: str) -> Path:
+    """Uses the same portable destination for downloads and later disk checks."""
     folder = output_dir
     group = book.get('category_group', book.get('category', ''))
     if group:
         folder /= sanitize_filename(group)
         if book.get('subcategory'):
             folder /= sanitize_filename(book['subcategory'])
+    stem = f"{book.get('title', '')} - {book.get('author', '')}"
+    filename = sanitize_filename(stem, 150 - len(extension) - 1) + '.' + extension
+    return folder / filename
+
+def existing_download(book: Dict[str, Any], output_dir: Path) -> Optional[Path]:
+    """Finds a validated document at the exact destination for this book."""
     for ext in ('pdf', 'epub', 'mobi', 'azw3', 'djvu'):
-        path = folder / sanitize_filename(f"{book.get('title', '')} - {book.get('author', '')}.{ext}")
+        path = book_destination(book, output_dir, ext)
         if document_format(path):
             return path
     return None

@@ -6,7 +6,7 @@ from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 from typing import List, Dict, Any, Optional
 
-from anna_dl.utils import build_queries, candidate_matches, sanitize_filename, save_json, load_json, document_format, existing_download
+from anna_dl.utils import build_queries, candidate_matches, book_destination, save_json, load_json, document_format, existing_download
 from anna_dl.search import search_md5_candidates, get_direct_download_url, get_working_mirror
 from anna_dl.config import HEADERS, LIBGEN_MIRRORS, MIN_FILE_SIZE, ANNA_MIRRORS
 
@@ -93,8 +93,6 @@ def download_book(
     """
     title = book.get('title', 'Unknown')
     author = book.get('author', 'Unknown')
-    group = book.get('category_group', book.get('category', ''))
-    subcat = book.get('subcategory', '')
     prefer_format = book.get('prefer_format', 'pdf')
 
     queries = build_queries(title, author, book.get('search_query', ''))
@@ -122,25 +120,13 @@ def download_book(
                 tried.add(md5)
                 url, ext, referer = get_direct_download_url(md5, LIBGEN_MIRRORS, accept=accept)
                 if url and ext:
-                    filename = sanitize_filename(f"{title} - {author}.{ext}")
-                    if group and subcat:
-                        dest_path = output_dir / sanitize_filename(group) / sanitize_filename(subcat) / filename
-                    elif group:
-                        dest_path = output_dir / sanitize_filename(group) / filename
-                    else:
-                        dest_path = output_dir / filename
+                    dest_path = book_destination(book, output_dir, ext)
 
                     print(f"    [+] Probing candidate #{idx} ({md5[:8]}...) -> {ext.upper()} stream...")
                     if download_file(url, referer or '', dest_path):
-                        # Detect true format from magic bytes
-                        with open(dest_path, 'rb') as fp:
-                            magic = fp.read(4)
-                        if magic == b'PK\x03\x04' and dest_path.suffix != '.epub':
-                            new_path = dest_path.with_suffix('.epub')
-                            dest_path.replace(new_path)
-                            dest_path = new_path
-                        elif magic.startswith(b'%PDF') and dest_path.suffix != '.pdf':
-                            new_path = dest_path.with_suffix('.pdf')
+                        actual_format = document_format(dest_path)
+                        if actual_format and actual_format != dest_path.suffix[1:] and not (actual_format == 'mobi' and ext == 'azw3'):
+                            new_path = book_destination(book, output_dir, actual_format)
                             dest_path.replace(new_path)
                             dest_path = new_path
 
