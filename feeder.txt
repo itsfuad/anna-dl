@@ -1,0 +1,51 @@
+# =============================================================================
+#  anna-dl FEEDER LIST
+#
+#  One book per line. Run it from the GUI (Feeder tab -> Run feeder), or with:
+#      python -m anna_dl feed
+#
+#  HOW IT WORKS
+#    1. The books below are searched and downloaded from top to bottom.
+#    2. A book that can't be found is skipped (so it doesn't hold up the list)
+#       and recorded in feeder_ledger.json as "not_available".
+#    3. When the list is finished, every "not_available" book gets one more
+#       try at the very end, including books that failed on earlier runs.
+#    4. Books the ledger marks "downloaded" are skipped on later runs, so you
+#       can keep adding lines here and just run the feeder again.
+#       To download a book again, delete its entry from feeder_ledger.json.
+#
+#  LINE FORMAT
+#    Title | Author | parameter=value | parameter=value ...
+#
+#    - Separate fields with "|". Spaces around them don't matter.
+#    - The first unlabeled field is the title, the second is the author.
+#      A bare "pdf" or "epub" sets the format.
+#    - Lines starting with "#" are comments. Blank lines are ignored.
+#
+#  PARAMETERS
+#    title=   Book title. Required, unless isbn= is given.
+#    author=  Author name. Optional, but gives much more accurate matches.
+#    format=  pdf or epub: the format you prefer. If it isn't available,
+#             another format is downloaded instead.
+#             Default: the format picked in the GUI (or --format, default pdf).
+#    isbn=    ISBN-10 or ISBN-13, dashes allowed. Searched first, to get one
+#             exact edition. Works without a title (the file is then named
+#             after the ISBN), but add the title too when you can: every
+#             result is checked against the title/author before downloading,
+#             and an ISBN alone can't catch a mislabelled file.
+#    query=   Your own search text, tried before the automatic searches.
+#             Handy for a specific translation or edition, or odd spellings.
+#    folder=  Save into a subfolder of the download folder, up to two levels:
+#             folder=Philosophy   or   folder=Philosophy/Stoics
+#
+#  EXAMPLES  (delete the "#" at the start of a line to use it)
+#    Pride and Prejudice | Jane Austen
+#    Moby-Dick | Herman Melville | epub
+#    The Origin of Species | Charles Darwin | format=pdf | folder=Science
+#    title=Meditations | author=Marcus Aurelius | query=meditations george long | folder=Philosophy/Stoics
+#    Frankenstein | Mary Shelley | isbn=9780141439471 | epub
+#    isbn=978-0-14-143951-8
+#
+# =============================================================================
+#  YOUR BOOKS (one per line, below this line)
+
