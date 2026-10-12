@@ -54,3 +54,11 @@ class PathTests(unittest.TestCase):
                 stream.write(b'\xff')  # Invalid deflate block type.
             self.assertIsNone(document_format(path))
             self.assertIsNone(existing_download({'title':'Example','author':'Author'}, Path(folder)))
+
+    def test_exact_legacy_filenames_are_still_recognized(self):
+        for author, filename in [('', 'Example - .pdf'), ('Author Jr.', 'Example - Author Jr..pdf')]:
+            with self.subTest(author=author), tempfile.TemporaryDirectory() as folder:
+                root = Path(folder)
+                target = root / filename
+                target.write_bytes(b'%PDF-1.7\n' + b'x' * 12000)
+                self.assertEqual(existing_download({'title':'Example','author':author}, root), target)

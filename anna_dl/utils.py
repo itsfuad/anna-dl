@@ -60,6 +60,12 @@ def existing_download(book: Dict[str, Any], output_dir: Path) -> Optional[Path]:
         path = book_destination(book, output_dir, ext)
         if document_format(path):
             return path
+        # Earlier releases sanitized the complete name, preserving spaces/dots
+        # before its extension. Recognize that exact name without prefix matches.
+        legacy_name = re.sub(r'[\\/*?:"<>|]', '', f"{book.get('title', '')} - {book.get('author', '')}.{ext}").strip()[:150]
+        legacy_path = path.with_name(legacy_name)
+        if legacy_path != path and legacy_path.suffix == '.' + ext and document_format(legacy_path):
+            return legacy_path
     return None
 
 def clean_query_text(text: str) -> str:
