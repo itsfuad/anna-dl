@@ -17,8 +17,9 @@ def download_file(url: str, referer: str, dest_path: Path, min_size: int = MIN_F
     """
     dest_path.parent.mkdir(parents=True, exist_ok=True)
     temp_path = dest_path.with_suffix(f"{dest_path.suffix}.tmp")
-    if temp_path.exists() and temp_path.stat().st_size < min_size:
-        temp_path.unlink(missing_ok=True)
+    # A previous call may have tried a different edition under this filename.
+    # Resume only retries within this call, which all use the same candidate.
+    temp_path.unlink(missing_ok=True)
 
     # 1. Try curl with auto-resume and HTTP/1.1
     try:
