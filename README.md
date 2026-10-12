@@ -64,12 +64,37 @@ flowchart TD
 git clone https://github.com/nsozturk/anna-dl.git
 cd anna-dl
 
-# Install dependencies
-pip install -r requirements.txt
-
-# Install CLI tool globally / in active environment
-pip install -e .
+# Create an isolated environment (Linux/macOS)
+python3 -m venv .venv
+source .venv/bin/activate
+python -m pip install -e .
 ```
+
+On Windows, use `py -3 -m venv .venv`, then activate with
+`.venv\Scripts\Activate.ps1` in PowerShell or `.venv\Scripts\activate.bat` in
+Command Prompt, and run `python -m pip install -e .`.
+
+The CLI needs Python 3.8 or newer. The desktop GUI additionally needs Tkinter
+and a graphical desktop session. On Fedora, install Tkinter for system Python
+with `sudo dnf install python3-tkinter`; on Debian/Ubuntu use
+`sudo apt install python3-tk`. Windows and macOS Python installations must
+include Tcl/Tk support. Curl is optional: downloads fall back to Python requests
+when curl is unavailable.
+
+### Desktop GUI
+
+From the source checkout, launch with `python3 start_gui.py` on Linux/macOS,
+or `py -3 start_gui.py` on Windows. The launcher selects the checkout's `.venv`
+and uses the checkout as its working directory, even when started elsewhere.
+Existing Windows shortcuts to `anna_dl_gui.pyw` also use this launcher.
+
+After installation, `anna-dl gui` (or `anna-dl-gui`) starts the desktop app.
+For these installed commands, downloads, the feeder list, and logs default to
+the directory you run the command from. CLI and GUI work on Linux, Windows,
+and macOS; the GUI reports a clear error if Tkinter or a display is unavailable.
+
+From the parent `anna` folder, use `python3 anna-dl/start_gui.py` to launch and
+`git -C anna-dl status` to inspect this repository.
 
 *(Optional: For automatic DDoS-Guard JavaScript challenge resolution on direct Anna's Archive endpoints, install Playwright)*:
 ```bash
@@ -109,6 +134,9 @@ anna-dl download
 # High-throughput multi-threaded download (4 parallel workers)
 anna-dl download --parallel --workers 4
 
+# Limit attempted books (also works in parallel mode)
+anna-dl download --parallel --limit 5
+
 # Filter batch by specific category prefixes
 anna-dl download --categories 01,02,03
 
@@ -133,6 +161,31 @@ anna-dl sync
 # Display overall archive health & counts
 anna-dl status
 ```
+
+Completed batch attempts return exit code 0 only when all attempted books
+succeeded; failed attempts return 1 and invalid command arguments return 2.
+Disk synchronization and resume checks require an exact filename in the
+book's category folder and a recognized document format. PDF, EPUB, MOBI/AZW3,
+and DjVu are supported; EPUB validation also checks its ZIP entries and
+`mimetype`. These checks do not verify every document's internal structure or
+that a file's contents match its catalogue record.
+
+Partial downloads resume only within retries for the same candidate in one
+run. A new candidate or run starts fresh to avoid mixing different editions.
+Portable filenames retain their extension, handle Windows reserved names, and
+use a short hash when truncating long UTF-8 names.
+
+### Running the regression tests
+
+With the virtual environment activated:
+
+```bash
+python -m unittest discover -s tests -v
+```
+
+The tests use temporary files and controlled transport responses. They do not
+contact external mirrors or download books. CI runs them on Linux, Windows,
+and macOS with Python 3.8, 3.11, and 3.14.
 
 ---
 

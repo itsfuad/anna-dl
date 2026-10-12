@@ -12,6 +12,7 @@ dist/
 # Downloads & local logs (never commit downloads or user logs)
 downloads/
 download_log.json
+feeder_ledger.json
 books_queue.json
 *.pdf
 *.epub

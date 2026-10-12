@@ -12,6 +12,7 @@ setup(
     entry_points={
         "console_scripts": [
             "anna-dl=anna_dl.cli:main",
+            "anna-dl-gui=anna_dl.cli:gui_main",
             "bookdl=anna_dl.cli:main",
         ],
     },

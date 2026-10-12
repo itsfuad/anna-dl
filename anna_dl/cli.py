@@ -9,6 +9,22 @@ from anna_dl.feeder import ensure_feeder_file, run_feeder
 from anna_dl.sync import sync_log_from_disk
 from anna_dl.utils import load_json, existing_download
 
+def gui_main():
+    try:
+        from anna_dl.gui import App, tk
+    except ModuleNotFoundError as error:
+        if error.name != 'tkinter':
+            raise
+        print('Tkinter is required for the GUI. On Fedora: sudo dnf install python3-tkinter. '
+              'On Debian/Ubuntu: sudo apt install python3-tk. '
+              'On Windows/macOS, install Python with Tcl/Tk support.', file=sys.stderr)
+        sys.exit(1)
+    try:
+        App().mainloop()
+    except tk.TclError as error:
+        print(f'Cannot start the GUI: {error}. Run it in a graphical desktop session.', file=sys.stderr)
+        sys.exit(1)
+
 def main():
     # Windows consoles/pipes may use a legacy codepage that can't encode the emoji in log output
     for stream in (sys.stdout, sys.stderr):
@@ -23,8 +39,8 @@ def main():
     )
     parser.add_argument(
         'command',
-        choices=['get', 'feed', 'download', 'retry', 'extract', 'sync', 'status'],
-        help="Action to perform: get (single book), feed (books listed in feeder.txt), download (queue), retry (failed), extract (from md), sync (verify disk), status"
+        choices=['gui', 'get', 'feed', 'download', 'retry', 'extract', 'sync', 'status'],
+        help="Action to perform: gui (desktop app), get (single book), feed (books listed in feeder.txt), download (queue), retry (failed), extract (from md), sync (verify disk), status"
     )
 
     parser.add_argument('--title', type=str, help="Book title (required for 'get')")
@@ -56,7 +72,9 @@ def main():
         config.enable_dns_bypass()
 
     try:
-        if args.command == 'get':
+        if args.command == 'gui':
+            gui_main()
+        elif args.command == 'get':
             if not args.title:
                 print("Error: --title is required for 'get' command.")
                 print("Usage: anna-dl get --title 'Atomic Habits' --author 'James Clear'")
